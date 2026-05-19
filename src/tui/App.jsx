@@ -63,7 +63,7 @@ export default function App() {
       for (const off of Object.values(slotMap)) {
         const port = p.base + wt.bucket * 8 + off;
         const live = livePorts.get(port);
-        if (live) { try { process.kill(live.pid); } catch {} }
+        if (live) { try { process.kill(live.pid); } catch (e) { if (e.code !== 'ESRCH') throw e; } }
       }
     }
   }
@@ -82,10 +82,10 @@ export default function App() {
             if (r.projects[name]) { setMode('list'); return; }
             const base = nextFreeBase(r);
             r.projects[name] = {
-              root: raw,
+              root: expanded,
               base,
               worktrees: {
-                [name]: { path: raw, bucket: 0, first_seen: new Date().toISOString().slice(0, 10) },
+                [name]: { path: expanded, bucket: 0, first_seen: new Date().toISOString().slice(0, 10) },
               },
             };
             await saveRegistry(r);
