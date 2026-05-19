@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+// Static import for contention test — safe because getPaths() is called at invocation time, not module load time.
 import { withRegistryLock, loadRegistry, saveRegistry } from '../lib/registry.mjs';
 
 let tmpDir;
@@ -60,6 +61,15 @@ describe('lib/registry', () => {
 });
 
 describe('withRegistryLock contention', () => {
+  let contTmpDir;
+  beforeEach(async () => {
+    contTmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'omcport-reg-contention-'));
+    process.env.OMCPORT_DIR = contTmpDir;
+  });
+  afterEach(async () => {
+    await fs.rm(contTmpDir, { recursive: true, force: true });
+  });
+
   it('serializes 5 concurrent writers, no corruption', async () => {
     const init = await loadRegistry();
     await saveRegistry(init);
