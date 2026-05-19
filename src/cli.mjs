@@ -1,12 +1,15 @@
 import os from 'node:os';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import React from 'react';
+import { render } from 'ink';
 import { detect } from '../lib/detect.mjs';
 import { loadRegistry, saveRegistry, withRegistryLock, hostnameMatches } from '../lib/registry.mjs';
 import { portFor, WORKTREE_WINDOW, inPool, strideIntersectsDenylist } from '../lib/pool.mjs';
 import { logEvent } from '../lib/log.mjs';
 import { nextFreeBase } from '../lib/allocate.mjs';
 import { getPaths } from '../lib/paths.mjs';
+import App from './tui/App.jsx';
 
 const SUBCOMMANDS = {
   here: cmdHere,
@@ -56,7 +59,7 @@ async function cmdLs(args) {
 }
 
 async function cmdDefault() {
-  console.log('usage: omcport <here|ls|claim|release|free|scan|doctor|adopt|gc|tail>');
+  render(React.createElement(App));
 }
 
 function parseFlags(args) {

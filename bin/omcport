@@ -1,2 +1,13 @@
 #!/usr/bin/env node
+import { register } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import { resolve as resolvePath } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+register(
+  pathToFileURL(resolvePath(__dirname, '../jsx-loader.mjs')).href,
+  import.meta.url
+);
+
 import('../src/cli.mjs').then(m => m.main(process.argv.slice(2)));
