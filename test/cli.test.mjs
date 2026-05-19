@@ -67,3 +67,29 @@ describe('omcport ls', () => {
     expect(data.projects.lifeline.base).toBe(13000);
   });
 });
+
+describe('omcport claim / release', () => {
+  it('claim returns a port, release frees it, re-claim reuses', async () => {
+    const repo = path.join(tmpDir, 'lifeline');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+
+    const c1 = await run(['claim', '--slot', 'mock-stripe'], { cwd: repo });
+    expect(c1.code).toBe(0);
+    const port1 = parseInt(c1.stdout.trim(), 10);
+    expect(port1).toBeGreaterThanOrEqual(13000);
+    expect(port1).toBeLessThanOrEqual(13007);
+
+    const c2 = await run(['claim', '--slot', 'mock-stripe'], { cwd: repo });
+    expect(parseInt(c2.stdout.trim(), 10)).toBe(port1);
+
+    const c3 = await run(['claim', '--slot', 'mock-twilio'], { cwd: repo });
+    const port3 = parseInt(c3.stdout.trim(), 10);
+    expect(port3).not.toBe(port1);
+
+    const rel = await run(['release', '--slot', 'mock-stripe'], { cwd: repo });
+    expect(rel.code).toBe(0);
+
+    const c4 = await run(['claim', '--slot', 'mock-stripe'], { cwd: repo });
+    expect(parseInt(c4.stdout.trim(), 10)).toBe(port1);
+  });
+});
