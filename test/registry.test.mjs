@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { withRegistryLock, loadRegistry, saveRegistry } from '../lib/registry.mjs';
 
 let tmpDir;
 beforeEach(async () => {
@@ -55,5 +56,24 @@ describe('lib/registry', () => {
     expect(hostnameMatches(reg)).toBe(true);
     reg.meta.hostname = 'some-other-host';
     expect(hostnameMatches(reg)).toBe(false);
+  });
+});
+
+describe('withRegistryLock contention', () => {
+  it('serializes 5 concurrent writers, no corruption', async () => {
+    const init = await loadRegistry();
+    await saveRegistry(init);
+
+    const writers = Array.from({ length: 5 }, (_, i) =>
+      withRegistryLock(async () => {
+        const reg = await loadRegistry();
+        reg.projects[`p${i}`] = { root: `~/dev/p${i}`, base: 13000 + i * 32, worktrees: {} };
+        await saveRegistry(reg);
+      })
+    );
+    await Promise.all(writers);
+
+    const final = await loadRegistry();
+    expect(Object.keys(final.projects).sort()).toEqual(['p0','p1','p2','p3','p4']);
   });
 });
