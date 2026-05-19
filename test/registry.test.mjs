@@ -48,4 +48,12 @@ describe('lib/registry', () => {
     const ok = await fs.access(path.join(tmpDir, 'registry.toml.bak')).then(() => true, () => false);
     expect(ok).toBe(true);
   });
+
+  it('hostnameMatches returns true for current host, false for other', async () => {
+    const { hostnameMatches, EMPTY_REGISTRY } = await import(/* @vite-ignore */ `../lib/registry.mjs?t=${Date.now()}e`);
+    const reg = EMPTY_REGISTRY();
+    expect(hostnameMatches(reg)).toBe(true);
+    reg.meta.hostname = 'some-other-host';
+    expect(hostnameMatches(reg)).toBe(false);
+  });
 });
