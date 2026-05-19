@@ -81,3 +81,46 @@ describe('resolveProjectKey', () => {
     expect(resolveProjectKey('/some/random/path', { projects: {} })).toBeNull();
   });
 });
+
+describe('detect (top-level)', () => {
+  let detTmpDir;
+  beforeEach(async () => {
+    detTmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'omcport-det-int-'));
+    process.env.OMCPORT_DIR = detTmpDir;
+    process.env.OMCPORT_PROJECT_ROOTS = detTmpDir;
+  });
+  afterEach(async () => {
+    await fs.rm(detTmpDir, { recursive: true, force: true });
+  });
+
+  it('auto-creates project + bucket 0 on first call', async () => {
+    const repo = path.join(detTmpDir, 'fake-project');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+
+    const { detect } = await import(/* @vite-ignore */ `../lib/detect.mjs?t=${Date.now()}h`);
+    const result = await detect(repo);
+    expect(result.project).toBe('fake-project');
+    expect(result.bucket).toBe(0);
+    expect(result.ports.web).toBe(result.base);
+    expect(result.ports.api).toBe(result.base + 1);
+
+    const { loadRegistry } = await import(/* @vite-ignore */ `../lib/registry.mjs?t=${Date.now()}i`);
+    const reg = await loadRegistry();
+    expect(reg.projects['fake-project'].base).toBe(result.base);
+  });
+
+  it('returns null for cwd outside any project root', async () => {
+    const { detect } = await import(/* @vite-ignore */ `../lib/detect.mjs?t=${Date.now()}j`);
+    expect(await detect(os.tmpdir())).toBeNull();
+  });
+
+  it('persists bucket assignment across calls', async () => {
+    const repo = path.join(detTmpDir, 'persistent');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+    const { detect } = await import(/* @vite-ignore */ `../lib/detect.mjs?t=${Date.now()}k`);
+    const a = await detect(repo);
+    const b = await detect(repo);
+    expect(b.bucket).toBe(a.bucket);
+    expect(b.ports).toEqual(a.ports);
+  });
+});
