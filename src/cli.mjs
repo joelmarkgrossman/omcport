@@ -8,6 +8,7 @@ const SUBCOMMANDS = {
   ls: cmdLs,
   claim: cmdClaim,
   release: cmdRelease,
+  free: cmdFree,
 };
 
 export async function main(argv) {
@@ -117,5 +118,16 @@ async function cmdRelease(args) {
     await logEvent({ kind: 'release', project: resolved.project, slot, port: wt.claims[slot].port });
     delete wt.claims[slot];
     await saveRegistry(reg);
+  });
+}
+
+async function cmdFree([name]) {
+  if (!name) throw new Error('free requires a project name');
+  await withRegistryLock(async () => {
+    const reg = await loadRegistry();
+    if (!reg.projects[name]) throw new Error(`no project: ${name}`);
+    delete reg.projects[name];
+    await saveRegistry(reg);
+    await logEvent({ kind: 'free', project: name });
   });
 }

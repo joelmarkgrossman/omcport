@@ -68,6 +68,22 @@ describe('omcport ls', () => {
   });
 });
 
+describe('omcport free', () => {
+  it('removes a project from the registry', async () => {
+    const repo = path.join(tmpDir, 'doomed');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+    await run(['here'], { cwd: repo });
+    const before = JSON.parse((await run(['ls', '--json'])).stdout);
+    expect(before.projects.doomed).toBeDefined();
+
+    const f = await run(['free', 'doomed']);
+    expect(f.code).toBe(0);
+
+    const after = JSON.parse((await run(['ls', '--json'])).stdout);
+    expect(after.projects.doomed).toBeUndefined();
+  });
+});
+
 describe('omcport claim / release', () => {
   it('claim returns a port, release frees it, re-claim reuses', async () => {
     const repo = path.join(tmpDir, 'lifeline');
