@@ -2,8 +2,8 @@ import os from 'node:os';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { detect } from '../lib/detect.mjs';
-import { loadRegistry, saveRegistry, withRegistryLock } from '../lib/registry.mjs';
-import { portFor, WORKTREE_WINDOW } from '../lib/pool.mjs';
+import { loadRegistry, saveRegistry, withRegistryLock, hostnameMatches } from '../lib/registry.mjs';
+import { portFor, WORKTREE_WINDOW, inPool, strideIntersectsDenylist } from '../lib/pool.mjs';
 import { logEvent } from '../lib/log.mjs';
 import { nextFreeBase } from '../lib/allocate.mjs';
 
@@ -14,6 +14,7 @@ const SUBCOMMANDS = {
   release: cmdRelease,
   free: cmdFree,
   scan: cmdScan,
+  doctor: cmdDoctor,
 };
 
 export async function main(argv) {
@@ -183,4 +184,35 @@ async function cmdScan(args) {
     await saveRegistry(reg);
   });
   console.log(`scanned ${candidates.length} candidates`);
+}
+
+async function cmdDoctor() {
+  const reg = await loadRegistry();
+  const issues = [];
+
+  if (!hostnameMatches(reg)) {
+    issues.push(`hostname mismatch: registry=${reg.meta.hostname} machine=${os.hostname()}`);
+  }
+  const baseOwners = new Map();
+  for (const [k, p] of Object.entries(reg.projects)) {
+    baseOwners.set(p.base, (baseOwners.get(p.base) ?? []).concat(k));
+    if (!inPool(p.base)) issues.push(`project ${k} base ${p.base} outside pool`);
+    if (strideIntersectsDenylist(p.base, reg.meta.denylist ?? [])) {
+      issues.push(`project ${k} base ${p.base} stride intersects denylist`);
+    }
+    for (const [wtKey, wt] of Object.entries(p.worktrees ?? {})) {
+      const real = wt.path.startsWith('~')
+        ? path.join(os.homedir(), wt.path.slice(1))
+        : wt.path;
+      const ok = await fs.stat(real).then(() => true, () => false);
+      if (!ok) issues.push(`project ${k} worktree ${wtKey} path missing: ${wt.path}`);
+    }
+  }
+  for (const [base, owners] of baseOwners) {
+    if (owners.length > 1) issues.push(`duplicate base ${base}: ${owners.join(', ')}`);
+  }
+
+  if (issues.length === 0) { console.log('healthy'); return; }
+  for (const i of issues) console.log(`- ${i}`);
+  process.exit(2);
 }

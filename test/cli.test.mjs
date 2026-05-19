@@ -84,6 +84,47 @@ describe('omcport free', () => {
   });
 });
 
+describe('omcport doctor', () => {
+  it('reports clean registry as healthy', async () => {
+    const { code, stdout } = await run(['doctor']);
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/healthy/i);
+  });
+
+  it('reports duplicate base assignments', async () => {
+    const bad = `[meta]
+schema = 1
+hostname = "${os.hostname()}"
+pool_start = 13000
+pool_end = 17999
+stride = 32
+worktree_window = 8
+strict = false
+denylist = []
+
+[slots.defaults]
+web = 0
+api = 1
+
+[projects.a]
+root = "~/dev/a"
+base = 13000
+[projects.a.worktrees]
+
+[projects.b]
+root = "~/dev/b"
+base = 13000
+[projects.b.worktrees]
+`;
+    await fs.mkdir(tmpDir, { recursive: true });
+    await fs.writeFile(path.join(tmpDir, 'registry.toml'), bad);
+
+    const { code, stdout } = await run(['doctor']);
+    expect(code).not.toBe(0);
+    expect(stdout).toMatch(/duplicate base/i);
+  });
+});
+
 describe('omcport claim / release', () => {
   it('claim returns a port, release frees it, re-claim reuses', async () => {
     const repo = path.join(tmpDir, 'lifeline');
