@@ -1,7 +1,11 @@
+import os from 'node:os';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { detect } from '../lib/detect.mjs';
 import { loadRegistry, saveRegistry, withRegistryLock } from '../lib/registry.mjs';
 import { portFor, WORKTREE_WINDOW } from '../lib/pool.mjs';
 import { logEvent } from '../lib/log.mjs';
+import { nextFreeBase } from '../lib/allocate.mjs';
 
 const SUBCOMMANDS = {
   here: cmdHere,
@@ -9,6 +13,7 @@ const SUBCOMMANDS = {
   claim: cmdClaim,
   release: cmdRelease,
   free: cmdFree,
+  scan: cmdScan,
 };
 
 export async function main(argv) {
@@ -130,4 +135,52 @@ async function cmdFree([name]) {
     await saveRegistry(reg);
     await logEvent({ kind: 'free', project: name });
   });
+}
+
+async function cmdScan(args) {
+  const apply = args.includes('--yes');
+  const roots = (process.env.OMCPORT_PROJECT_ROOTS
+    ? process.env.OMCPORT_PROJECT_ROOTS.split(':')
+    : [`${os.homedir()}/dev`, `${os.homedir()}/imga-dev`])
+    .map(p => path.resolve(p));
+
+  const candidates = [];
+  for (const root of roots) {
+    let entries;
+    try { entries = await fs.readdir(root, { withFileTypes: true }); }
+    catch { continue; }
+    for (const ent of entries) {
+      if (!ent.isDirectory()) continue;
+      const repo = path.join(root, ent.name);
+      const ok = await fs.stat(path.join(repo, '.git')).then(() => true, () => false);
+      if (ok) candidates.push({ name: ent.name, path: repo });
+    }
+  }
+
+  if (!apply) {
+    console.log('Would add:');
+    for (const c of candidates) console.log(`  ${c.name}  ${c.path}`);
+    console.log(`\nRe-run with --yes to apply.`);
+    return;
+  }
+
+  await withRegistryLock(async () => {
+    const reg = await loadRegistry();
+    for (const c of candidates) {
+      if (reg.projects[c.name]) continue;
+      const base = nextFreeBase(reg);
+      const tilde = c.path.startsWith(os.homedir())
+        ? '~' + c.path.slice(os.homedir().length)
+        : c.path;
+      reg.projects[c.name] = {
+        root: tilde,
+        base,
+        worktrees: {
+          [c.name]: { path: tilde, bucket: 0, first_seen: new Date().toISOString().slice(0, 10) },
+        },
+      };
+    }
+    await saveRegistry(reg);
+  });
+  console.log(`scanned ${candidates.length} candidates`);
 }
