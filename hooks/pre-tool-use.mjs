@@ -3,6 +3,8 @@
 // PreToolUse hook for Claude Code. Reads JSON on stdin, writes JSON to stdout.
 // MUST NEVER crash Claude — any error path returns {} and exits 0.
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { detect } from '../lib/detect.mjs';
 import { computeEnv } from '../lib/env.mjs';
 import { logEvent } from '../lib/log.mjs';
@@ -56,6 +58,7 @@ async function main() {
 
   if (payload.tool_name !== 'Bash') return emit({});
   const cwd = payload.cwd ?? process.cwd();
+  if (fs.existsSync(path.join(cwd, '.omcport-disable'))) return emit({});
 
   let resolved;
   try { resolved = await detect(cwd); }

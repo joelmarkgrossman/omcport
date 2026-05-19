@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // hooks/session-start.mjs
+import fs from 'node:fs';
+import path from 'node:path';
 import { detect } from '../lib/detect.mjs';
 
 async function readStdin() {
@@ -15,6 +17,7 @@ async function main() {
   let payload = {};
   try { payload = JSON.parse(await readStdin() || '{}'); } catch {}
   const cwd = payload.cwd ?? process.cwd();
+  if (fs.existsSync(path.join(cwd, '.omcport-disable'))) return emit({});
 
   let resolved;
   try { resolved = await detect(cwd); } catch { return emit({}); }
