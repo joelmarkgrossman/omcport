@@ -3,11 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import path from 'node:path';
 import os from 'node:os';
+import fsSync from 'node:fs';
 import { loadRegistry, saveRegistry, withRegistryLock } from '../../lib/registry.mjs';
 import { listListeningPorts } from '../../lib/lsof.mjs';
 import { nextFreeBase } from '../../lib/allocate.mjs';
 import ProjectList from './ProjectList.jsx';
 import AddProject from './AddProject.jsx';
+import SlotMap from './SlotMap.jsx';
+import WorktreePanel from './WorktreePanel.jsx';
 
 export default function App() {
   const { exit } = useApp();
@@ -41,6 +44,10 @@ export default function App() {
     if (input === 'a') setMode('add');
     if (input === 'f') { await freeSelected(); await refresh(); }
     if (input === 'k') { await killSelected(); await refresh(); }
+    if (input === 's') setMode('slot-map');
+    if (input === 'w') setMode('worktrees');
+    if (input === 'g') { await gcStaleWorktrees(); await refresh(); }
+    if (input === 'r') { await reassignBaseSelected(); await refresh(); }
   });
 
   async function freeSelected() {
@@ -68,7 +75,45 @@ export default function App() {
     }
   }
 
+  async function gcStaleWorktrees() {
+    await withRegistryLock(async () => {
+      const r = await loadRegistry();
+      for (const p of Object.values(r.projects)) {
+        for (const [k, wt] of Object.entries(p.worktrees ?? {})) {
+          const real = wt.path.startsWith('~') ? path.join(os.homedir(), wt.path.slice(1)) : wt.path;
+          const ok = fsSync.existsSync(real);
+          if (!ok) delete p.worktrees[k];
+        }
+      }
+      await saveRegistry(r);
+    });
+  }
+
+  async function reassignBaseSelected() {
+    const projects = Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base);
+    const [key, p] = projects[selectedIndex] ?? [];
+    if (!key) return;
+    await withRegistryLock(async () => {
+      const r = await loadRegistry();
+      delete r.projects[key];
+      const newBase = nextFreeBase(r);
+      r.projects[key] = { ...p, base: newBase };
+      await saveRegistry(r);
+    });
+  }
+
   if (!registry) return <Text>loading…</Text>;
+
+  if (mode === 'slot-map') {
+    const [key, p] = Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base)[selectedIndex] ?? [];
+    if (!key) { setMode('list'); return null; }
+    return <SlotMap projectKey={key} project={p} registry={registry} livePorts={livePorts} onBack={() => setMode('list')} />;
+  }
+  if (mode === 'worktrees') {
+    const [key, p] = Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base)[selectedIndex] ?? [];
+    if (!key) { setMode('list'); return null; }
+    return <WorktreePanel projectKey={key} project={p} onBack={() => setMode('list')} />;
+  }
 
   if (mode === 'add') {
     return (
@@ -105,7 +150,7 @@ export default function App() {
       </Box>
       <ProjectList registry={registry} livePorts={livePorts} selectedIndex={Math.min(selectedIndex, count - 1)} />
       <Box marginTop={1}>
-        <Text dimColor>[↑↓] navigate  [a] add  [f] free  [k] kill  [q] quit</Text>
+        <Text dimColor>[↑↓] navigate  [a] add  [f] free  [k] kill  [s] slot-map  [w] worktrees  [g] gc  [r] reassign  [q] quit</Text>
       </Box>
     </Box>
   );
