@@ -83,7 +83,7 @@ async function main() {
   const cmd = payload.tool_input?.command ?? '';
   const ports = extractPorts(cmd);
   if (ports.length === 0) {
-    return emit({ hookSpecificOutput: { additionalContext: summary } });
+    return emit({ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: summary } });
   }
 
   const assignedSet = new Set(Object.values(resolved.ports));
@@ -99,6 +99,7 @@ async function main() {
         await safeLog({ kind: 'block', project: resolved.project, attempted: N, owner });
         return emit({
           hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
             permissionDecision: 'deny',
             permissionDecisionReason:
               `omcport: port ${N} belongs to ${owner}; this project (${resolved.project}) is ` +
@@ -111,13 +112,14 @@ async function main() {
       await safeLog({ kind: 'rewrite-suggestion', project: resolved.project, from: N, to: resolved.ports.web });
       return emit({
         hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
           additionalContext:
             `omcport: rewrite ${N} → ${resolved.ports.web} (this project's web port). Use: ${suggested}`,
         },
       });
     }
   }
-  return emit({ hookSpecificOutput: { additionalContext: summary } });
+  return emit({ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: summary } });
 }
 
 main().catch(() => emit({}));
