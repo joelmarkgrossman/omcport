@@ -125,6 +125,51 @@ base = 13000
   });
 });
 
+describe('omcport adopt / gc / tail', () => {
+  it('adopt rewrites hostname to current', async () => {
+    const reg = `[meta]
+schema = 1
+hostname = "OtherMac"
+pool_start = 13000
+pool_end = 17999
+stride = 32
+worktree_window = 8
+strict = false
+denylist = []
+[slots.defaults]
+web = 0
+[projects]
+`;
+    await fs.mkdir(tmpDir, { recursive: true });
+    await fs.writeFile(path.join(tmpDir, 'registry.toml'), reg);
+
+    const { code } = await run(['adopt']);
+    expect(code).toBe(0);
+    const data = JSON.parse((await run(['ls', '--json'])).stdout);
+    expect(data.meta.hostname).toBe(os.hostname());
+  });
+
+  it('gc removes worktrees whose paths are missing', async () => {
+    const repo = path.join(tmpDir, 'doomed');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+    await run(['here'], { cwd: repo });
+    await fs.rm(repo, { recursive: true });
+
+    const { stdout } = await run(['gc']);
+    expect(stdout).toMatch(/removed 1/);
+    const data = JSON.parse((await run(['ls', '--json'])).stdout);
+    expect(Object.keys(data.projects.doomed?.worktrees ?? {})).toEqual([]);
+  });
+
+  it('tail prints last N log lines', async () => {
+    const repo = path.join(tmpDir, 'lifeline');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+    await run(['claim', '--slot', 'x'], { cwd: repo });
+    const { stdout } = await run(['tail']);
+    expect(stdout).toMatch(/claim/);
+  });
+});
+
 describe('omcport claim / release', () => {
   it('claim returns a port, release frees it, re-claim reuses', async () => {
     const repo = path.join(tmpDir, 'lifeline');

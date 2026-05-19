@@ -6,6 +6,7 @@ import { loadRegistry, saveRegistry, withRegistryLock, hostnameMatches } from '.
 import { portFor, WORKTREE_WINDOW, inPool, strideIntersectsDenylist } from '../lib/pool.mjs';
 import { logEvent } from '../lib/log.mjs';
 import { nextFreeBase } from '../lib/allocate.mjs';
+import { getPaths } from '../lib/paths.mjs';
 
 const SUBCOMMANDS = {
   here: cmdHere,
@@ -15,6 +16,9 @@ const SUBCOMMANDS = {
   free: cmdFree,
   scan: cmdScan,
   doctor: cmdDoctor,
+  adopt: cmdAdopt,
+  gc: cmdGc,
+  tail: cmdTail,
 };
 
 export async function main(argv) {
@@ -215,4 +219,41 @@ async function cmdDoctor() {
   if (issues.length === 0) { console.log('healthy'); return; }
   for (const i of issues) console.log(`- ${i}`);
   process.exit(2);
+}
+
+async function cmdAdopt() {
+  await withRegistryLock(async () => {
+    const reg = await loadRegistry();
+    reg.meta.hostname = os.hostname();
+    await saveRegistry(reg);
+  });
+  console.log(`adopted as ${os.hostname()}`);
+}
+
+async function cmdGc() {
+  let removed = 0;
+  await withRegistryLock(async () => {
+    const reg = await loadRegistry();
+    for (const p of Object.values(reg.projects)) {
+      for (const [wtKey, wt] of Object.entries(p.worktrees ?? {})) {
+        const real = wt.path.startsWith('~')
+          ? path.join(os.homedir(), wt.path.slice(1))
+          : wt.path;
+        const ok = await fs.stat(real).then(() => true, () => false);
+        if (!ok) { delete p.worktrees[wtKey]; removed++; }
+      }
+    }
+    await saveRegistry(reg);
+  });
+  console.log(`removed ${removed} stale worktree entries`);
+}
+
+async function cmdTail(args) {
+  const { LOG_PATH } = getPaths();
+  const n = parseInt(args[0] ?? '20', 10);
+  let raw;
+  try { raw = await fs.readFile(LOG_PATH, 'utf8'); }
+  catch { console.log('(no log yet)'); return; }
+  const lines = raw.trim().split('\n').slice(-n);
+  for (const line of lines) console.log(line);
 }
