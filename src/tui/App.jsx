@@ -97,7 +97,7 @@ export default function App() {
       const r = await loadRegistry();
       delete r.projects[key];
       const newBase = nextFreeBase(r);
-      r.projects[key] = { ...p, base: newBase };
+      r.projects[key] = { ...r.projects[key], base: newBase };
       await saveRegistry(r);
     });
   }
