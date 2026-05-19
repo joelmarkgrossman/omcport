@@ -45,3 +45,25 @@ describe('omcport here', () => {
     expect(stdout).toMatch(/no project/i);
   });
 });
+
+describe('omcport ls', () => {
+  it('lists projects as a table', async () => {
+    const repo = path.join(tmpDir, 'lifeline');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+    await run(['here'], { cwd: repo });
+    const { code, stdout } = await run(['ls']);
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/PROJECT/);
+    expect(stdout).toMatch(/lifeline/);
+    expect(stdout).toMatch(/13000/);
+  });
+
+  it('emits JSON with --json', async () => {
+    const repo = path.join(tmpDir, 'lifeline');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+    await run(['here'], { cwd: repo });
+    const { stdout } = await run(['ls', '--json']);
+    const data = JSON.parse(stdout);
+    expect(data.projects.lifeline.base).toBe(13000);
+  });
+});
