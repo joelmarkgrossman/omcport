@@ -19,7 +19,7 @@ export default function ProjectList({ registry, livePorts, selectedIndex }) {
           .sort((a, b) => a[1].bucket - b[1].bucket)
           .map(([label, wt]) => `${wt.bucket}:${truncate(label, 18)}`)
           .join(', ');
-        const slotMap = p.slots ?? registry.slots.defaults;
+        const slotMap = p.slots ?? registry.slots?.defaults ?? {};
         const myPorts = [];
         for (const wt of Object.values(p.worktrees ?? {})) {
           for (const [slot, off] of Object.entries(slotMap)) {

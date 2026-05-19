@@ -14,10 +14,13 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     async function refresh() {
-      const [r, l] = await Promise.all([loadRegistry(), listListeningPorts()]);
-      if (cancelled) return;
-      setRegistry(r);
-      setLivePorts(l);
+      try {
+        const [r, l] = await Promise.all([loadRegistry(), listListeningPorts()]);
+        if (cancelled) return;
+        setRegistry(r);
+        setLivePorts(l);
+        setSelectedIndex(i => Math.max(0, Math.min(i, Object.keys(r.projects).length - 1)));
+      } catch { /* registry unavailable; keep showing last known state */ }
     }
     refresh();
     const interval = setInterval(refresh, 2000);
