@@ -109,11 +109,13 @@ async function cmdRelease(args) {
     const reg = await loadRegistry();
     const project = reg.projects[resolved.project];
     const wtKey = findWorktreeForBucket(project, resolved.bucket);
+    if (!wtKey) throw new Error('worktree row missing — registry corrupt');
     const wt = project.worktrees[wtKey];
-    if (wt.claims && wt.claims[slot]) {
-      await logEvent({ kind: 'release', project: resolved.project, slot, port: wt.claims[slot].port });
-      delete wt.claims[slot];
-      await saveRegistry(reg);
+    if (!wt.claims || !wt.claims[slot]) {
+      throw new Error(`slot '${slot}' not claimed`);
     }
+    await logEvent({ kind: 'release', project: resolved.project, slot, port: wt.claims[slot].port });
+    delete wt.claims[slot];
+    await saveRegistry(reg);
   });
 }
