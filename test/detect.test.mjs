@@ -45,3 +45,39 @@ describe('resolveWorktreeRoot', () => {
     expect(await resolveWorktreeRoot(link)).toBe(await fs.realpath(real));
   });
 });
+
+describe('resolveProjectKey', () => {
+  const HOME = os.homedir();
+
+  it('fast path: ~/dev/<name>', async () => {
+    const { resolveProjectKey } = await import(/* @vite-ignore */ `../lib/detect.mjs?t=${Date.now()}d`);
+    const reg = { projects: {} };
+    expect(resolveProjectKey(`${HOME}/dev/lifeline`, reg)).toBe('lifeline');
+    expect(resolveProjectKey(`${HOME}/dev/lifeline/src/deep`, reg)).toBe('lifeline');
+  });
+
+  it('fast path: ~/imga-dev/<name>', async () => {
+    const { resolveProjectKey } = await import(/* @vite-ignore */ `../lib/detect.mjs?t=${Date.now()}e`);
+    expect(resolveProjectKey(`${HOME}/imga-dev/teamworks-schedulerator`, { projects: {} }))
+      .toBe('teamworks-schedulerator');
+  });
+
+  it('registry-based path: matches existing worktree path', async () => {
+    const { resolveProjectKey } = await import(/* @vite-ignore */ `../lib/detect.mjs?t=${Date.now()}f`);
+    const reg = {
+      projects: {
+        odd: {
+          root: '/tmp/odd-repo',
+          worktrees: { odd: { path: '/tmp/odd-repo', bucket: 0 } },
+        },
+      },
+    };
+    expect(resolveProjectKey('/tmp/odd-repo', reg)).toBe('odd');
+    expect(resolveProjectKey('/tmp/odd-repo/lib', reg)).toBe('odd');
+  });
+
+  it('returns null when no match', async () => {
+    const { resolveProjectKey } = await import(/* @vite-ignore */ `../lib/detect.mjs?t=${Date.now()}g`);
+    expect(resolveProjectKey('/some/random/path', { projects: {} })).toBeNull();
+  });
+});
