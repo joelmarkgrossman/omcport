@@ -79,4 +79,26 @@ describe('hooks/pre-tool-use env-context injection', () => {
     );
     expect(JSON.parse(res.stdout || '{}')).toEqual({});
   });
+
+  it('no-ops when OMCPORT_CLAIM=1', async () => {
+    const repo = path.join(tmpDir, 'lifeline');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+    const res = await runHook(
+      { tool_name: 'Bash', tool_input: { command: 'npm run dev' }, cwd: repo },
+      { OMCPORT_CLAIM: '1' }
+    );
+    expect(JSON.parse(res.stdout || '{}')).toEqual({});
+  });
+
+  it('no-ops when detect throws (OMCPORT_DIR is a file, not a dir)', async () => {
+    const badOmcDir = path.join(tmpDir, 'not-a-dir');
+    await fs.writeFile(badOmcDir, 'x');
+    const repo = path.join(tmpDir, 'lifeline');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+    const res = await runHook(
+      { tool_name: 'Bash', tool_input: { command: 'npm run dev' }, cwd: repo },
+      { OMCPORT_DIR: badOmcDir }
+    );
+    expect(JSON.parse(res.stdout || '{}')).toEqual({});
+  });
 });
