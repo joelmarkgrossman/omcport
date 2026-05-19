@@ -102,3 +102,51 @@ describe('hooks/pre-tool-use env-context injection', () => {
     expect(JSON.parse(res.stdout || '{}')).toEqual({});
   });
 });
+
+describe('hooks/pre-tool-use port-flag enforcement', () => {
+  it('blocks port belonging to a different project', async () => {
+    const repoA = path.join(tmpDir, 'a');
+    const repoB = path.join(tmpDir, 'b');
+    await fs.mkdir(path.join(repoA, '.git'), { recursive: true });
+    await fs.mkdir(path.join(repoB, '.git'), { recursive: true });
+    await runHook({ tool_name: 'Bash', tool_input: { command: 'pwd' }, cwd: repoA });
+    await runHook({ tool_name: 'Bash', tool_input: { command: 'pwd' }, cwd: repoB });
+
+    const res = await runHook({
+      tool_name: 'Bash',
+      tool_input: { command: 'vite --port 13032' },
+      cwd: repoA,
+    });
+    const reply = JSON.parse(res.stdout || '{}');
+    const decision = reply.hookSpecificOutput?.permissionDecision ?? reply.permissionDecision;
+    expect(decision).toBe('deny');
+    const reason = reply.hookSpecificOutput?.permissionDecisionReason ?? reply.permissionDecisionReason ?? '';
+    expect(reason).toMatch(/belongs to b/);
+    expect(reason).toMatch(/Suggested:/);
+  });
+
+  it('emits rewrite suggestion for known dev-default port', async () => {
+    const repo = path.join(tmpDir, 'lifeline');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+    const res = await runHook({
+      tool_name: 'Bash',
+      tool_input: { command: 'vite --port 5173' },
+      cwd: repo,
+    });
+    const reply = JSON.parse(res.stdout || '{}');
+    const ctx = reply.hookSpecificOutput?.additionalContext ?? reply.additionalContext ?? '';
+    expect(ctx).toMatch(/rewrite.*5173.*13000/i);
+  });
+
+  it('allows when port matches an assigned port', async () => {
+    const repo = path.join(tmpDir, 'lifeline');
+    await fs.mkdir(path.join(repo, '.git'), { recursive: true });
+    const res = await runHook({
+      tool_name: 'Bash',
+      tool_input: { command: 'vite --port 13000' },
+      cwd: repo,
+    });
+    const reply = JSON.parse(res.stdout || '{}');
+    expect(reply.hookSpecificOutput?.permissionDecision).not.toBe('deny');
+  });
+});

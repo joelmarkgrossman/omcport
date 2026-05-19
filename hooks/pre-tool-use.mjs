@@ -6,6 +6,30 @@
 import { detect } from '../lib/detect.mjs';
 import { computeEnv } from '../lib/env.mjs';
 import { logEvent } from '../lib/log.mjs';
+import { inPool, projectBaseRange } from '../lib/pool.mjs';
+import { loadRegistry } from '../lib/registry.mjs';
+
+const DEV_DEFAULTS = new Set([3000, 4321, 5000, 5173, 8000, 8080, 8888]);
+const PORT_FLAG_RE = /(?:--port[= ]|-p\s+|(?:VITE_|NEXT_|STORYBOOK_|NUXT_|DEV_)?PORT=)(\d{2,5})/g;
+const HOST_BIND_RE = /(?<![\w.])\d{1,3}(?:\.\d{1,3}){3}:(\d{2,5})/g;
+
+function extractPorts(cmd) {
+  const found = [];
+  for (const re of [PORT_FLAG_RE, HOST_BIND_RE]) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(cmd)) !== null) found.push(parseInt(m[1], 10));
+  }
+  return [...new Set(found)];
+}
+
+function findProjectByPort(reg, port) {
+  if (!reg) return null;
+  for (const [key, p] of Object.entries(reg.projects)) {
+    if (port >= p.base && port <= p.base + 31) return key;
+  }
+  return null;
+}
 
 async function readStdin() {
   let data = '';
@@ -56,7 +80,44 @@ async function main() {
 
   await safeLog({ kind: 'env-context', project: resolved.project, bucket: resolved.bucket });
 
-  emit({ hookSpecificOutput: { additionalContext: summary } });
+  const cmd = payload.tool_input?.command ?? '';
+  const ports = extractPorts(cmd);
+  if (ports.length === 0) {
+    return emit({ hookSpecificOutput: { additionalContext: summary } });
+  }
+
+  const assignedSet = new Set(Object.values(resolved.ports));
+  const reg = await loadRegistry().catch(() => null);
+  const myRange = projectBaseRange(resolved.base);
+
+  for (const N of ports) {
+    if (assignedSet.has(N)) continue;
+    if (inPool(N)) {
+      const owner = findProjectByPort(reg, N);
+      if (owner && owner !== resolved.project) {
+        const suggested = cmd.replace(String(N), String(resolved.ports.web));
+        await safeLog({ kind: 'block', project: resolved.project, attempted: N, owner });
+        return emit({
+          hookSpecificOutput: {
+            permissionDecision: 'deny',
+            permissionDecisionReason:
+              `omcport: port ${N} belongs to ${owner}; this project (${resolved.project}) is ` +
+              `${myRange.start}-${myRange.end}. Suggested: ${suggested}`,
+          },
+        });
+      }
+    } else if (DEV_DEFAULTS.has(N)) {
+      const suggested = cmd.replace(String(N), String(resolved.ports.web));
+      await safeLog({ kind: 'rewrite-suggestion', project: resolved.project, from: N, to: resolved.ports.web });
+      return emit({
+        hookSpecificOutput: {
+          additionalContext:
+            `omcport: rewrite ${N} → ${resolved.ports.web} (this project's web port). Use: ${suggested}`,
+        },
+      });
+    }
+  }
+  return emit({ hookSpecificOutput: { additionalContext: summary } });
 }
 
 main().catch(() => emit({}));
