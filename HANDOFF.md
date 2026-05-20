@@ -144,6 +144,48 @@ bash test-hook.sh /path/to/project         # manual ELI5 hook test
 
 All tests use `OMCPORT_DIR` env override + cache-busting `?t=${Date.now()}` dynamic imports for isolation. Never use frozen module-level imports from `paths.mjs` — always call `getPaths()` inside each function.
 
+## Next task: MCP server for Cursor agents
+
+**Goal:** Real port enforcement for Cursor (and any MCP-capable agent), not just soft guidance.
+
+Cursor agents don't fire Claude Code hooks. A Cursor global rule (`~/.cursor/rules/omcport.mdc`) is already in place — it instructs agents to run `omcport here` before starting servers. But it's advisory. The MCP server makes it structural.
+
+### Spec
+
+Expose omcport as an MCP server with three tools:
+
+| Tool | Input | Output |
+|------|-------|--------|
+| `omcport_here` | `{ cwd: string }` | `{ project, base, bucket, ports: {web,api,...} }` |
+| `omcport_claim` | `{ cwd: string, slot: string }` | `{ port: number, slot: string }` |
+| `omcport_release` | `{ cwd: string, slot: string }` | `{ ok: true }` |
+
+### Implementation
+
+- New file: `src/mcp-server.mjs` — stdio MCP server using `@modelcontextprotocol/sdk`
+- Entry point: `bin/omcport-mcp` (same pattern as `bin/omcport`)
+- Reuse existing lib functions: `detect()`, CLI claim/release logic from `src/cli.mjs`
+- Register in `~/.cursor/mcp.json` (already exists at that path)
+
+### Wire into Cursor
+
+```json
+// ~/.cursor/mcp.json — add entry:
+{
+  "mcpServers": {
+    "omcport": {
+      "command": "node",
+      "args": ["/Users/jgrossman/dev/omcport/bin/omcport-mcp"]
+    }
+  }
+}
+```
+
+### Testing
+
+- Unit: mock stdin/stdout MCP exchange, verify `omcport_here` returns correct ports for a tmp registry
+- Manual: open Cursor in any project, ask agent "what port should I use?" — should call `omcport_here` tool
+
 ## Known limitations / future work
 
 - TUI `WorktreePanel`: after freeing a worktree, returns to list immediately; stale data shows until the 2s poll fires
