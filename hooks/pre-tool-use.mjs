@@ -7,7 +7,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { detect } from '../lib/detect.mjs';
 import { computeEnv } from '../lib/env.mjs';
+import { loadFixedPortTools, matchFixedPortTool, resolveFixedPort } from '../lib/fixed-port-tools.mjs';
 import { logEvent } from '../lib/log.mjs';
+import { getPaths } from '../lib/paths.mjs';
 import { inPool, projectBaseRange } from '../lib/pool.mjs';
 import { loadRegistry } from '../lib/registry.mjs';
 
@@ -84,6 +86,46 @@ async function main() {
   await safeLog({ kind: 'env-context', project: resolved.project, bucket: resolved.bucket });
 
   const cmd = payload.tool_input?.command ?? '';
+
+  // Fixed-port tool detection — fires before generic port analysis.
+  // Tools like backlog.md manage their own port config; don't redirect them.
+  const { FIXED_PORT_TOOLS_PATH } = getPaths();
+  const fptTools = loadFixedPortTools(FIXED_PORT_TOOLS_PATH);
+  const fptMatch = matchFixedPortTool(fptTools, cmd);
+  if (fptMatch) {
+    const fixedPort = resolveFixedPort(fptMatch, cwd);
+    // Warn if the tool's configured port collides with another project in the pool
+    if (fixedPort && inPool(fixedPort)) {
+      const fptReg = await loadRegistry().catch(() => null);
+      const fptOwner = findProjectByPort(fptReg, fixedPort);
+      if (fptOwner && fptOwner !== resolved.project) {
+        await safeLog({ kind: 'fpt-conflict', project: resolved.project, tool: fptMatch.name, port: fixedPort, owner: fptOwner });
+        return emit({
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            additionalContext:
+              `omcport: WARNING — ${fptMatch.name} configured to use port ${fixedPort}` +
+              (fptMatch.config ? ` (from ${fptMatch.config})` : '') +
+              `, but that port belongs to project ${fptOwner}. ` +
+              `Edit ${fptMatch.config ?? 'the tool config'} to use a port outside 13000–17999.`,
+          },
+        });
+      }
+    }
+    // No conflict: advisory to leave this tool alone
+    const portNote = fixedPort ? ` port ${fixedPort}` : '';
+    const configNote = fptMatch.config ? ` (configured in ${fptMatch.config})` : '';
+    await safeLog({ kind: 'fpt-passthrough', project: resolved.project, tool: fptMatch.name, port: fixedPort });
+    return emit({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        additionalContext:
+          `omcport: ${fptMatch.name} manages its own${portNote} port${configNote}. ` +
+          `Run directly — do not override with PORT_WEB or PORT_API.`,
+      },
+    });
+  }
+
   const ports = extractPorts(cmd);
   if (ports.length === 0) {
     return emit({ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: summary } });
