@@ -58,6 +58,35 @@ Both hooks: catch all errors, always exit 0, emit `{}` on failure. Must never cr
 
 Kill switches: `OMCPORT_DISABLE=1` skips everything. `OMCPORT_CLAIM=1` skips the PreToolUse guard (used internally during `omcport claim`).
 
+### Fixed-port tools (`lib/fixed-port-tools.mjs`)
+
+Third-party tools (backlog.md, MailHog, etc.) manage their own port config and must not be redirected by omcport's PORT_WEB advisory.
+
+**Config file:** `~/.claude/omcport/fixed-port-tools.json` (user-editable, no code change needed to add new tools).
+
+```json
+[
+  {
+    "cmd": "backlog browser",      // substring matched against the Bash command
+    "config": "backlog/config.yml", // path relative to project CWD
+    "portKey": "default_port",     // key in config file (dot-notation for JSON)
+    "name": "backlog.md"           // display name in messages
+  },
+  {
+    "cmd": "mailhog",
+    "port": 8025,                  // static port (alternative to config+portKey)
+    "name": "MailHog"
+  }
+]
+```
+
+**PreToolUse behavior when a command matches:**
+- Port outside pool or no conflict → advisory: "manages its own port, run directly"
+- Port inside pool, owned by another project → warning to fix the tool's config file
+- Never blocks; always exits 0
+
+**YAML parsing:** simple regex `key: value` (no nesting). JSON: dot-notation key traversal. Both handled in `readConfigPort()` — no third-party YAML dep needed.
+
 ### Detection (`lib/detect.mjs`)
 
 Given a CWD:
@@ -82,6 +111,7 @@ lib/
   env.mjs                computeEnv() — builds PORT_* env var object
   log.mjs                logEvent() — JSONL append to log.jsonl
   lsof.mjs               listListeningPorts() — lsof → Map<port, {pid, command}>
+  fixed-port-tools.mjs   loadFixedPortTools(), matchFixedPortTool(), resolveFixedPort()
   paths.mjs              getPaths() — call at invocation time, honors OMCPORT_DIR
   pool.mjs               portFor(), inPool(), basesInPool(), strideIntersectsDenylist()
   registry.mjs           loadRegistry(), saveRegistry(), withRegistryLock()
