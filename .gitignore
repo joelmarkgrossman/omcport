@@ -1,4 +1,14 @@
+# Build / deps
 node_modules/
 .DS_Store
 *.log
 test-tmp/
+
+# Runtime data — should live in ~/.claude/omcport/, never in repo
+registry.toml
+registry.toml.bak
+log.jsonl
+fixed-port-tools.json
+
+# Local orchestration state
+.omc/
