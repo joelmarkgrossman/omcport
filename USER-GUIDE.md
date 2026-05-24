@@ -42,6 +42,55 @@ Claude will tell you the assigned ports in its context. It should use them autom
 OMCPORT_DISABLE=1 npm run dev   # single command bypass
 ```
 
+### Disable for a whole project (fixed-port apps)
+
+Some projects need a specific port and won't work otherwise — e.g. Dropbox-backed apps, OAuth callbacks pinned to `localhost:5173`, browser extensions hardcoded to a port. Drop a marker file in the project root:
+
+```bash
+touch /path/to/project/.omcport-disable
+```
+
+Both hooks (SessionStart + PreToolUse) detect this file and skip the project entirely. The project keeps its registry entry but no port enforcement happens.
+
+Current example: `~/dev/the_board/web/.omcport-disable` (Vite dev server pinned to 5173 for Dropbox sync).
+
+### Tools that bring their own port (backlog.md, MailHog, etc.)
+
+Some third-party tools manage their own port via their own config file. omcport recognizes these and won't try to redirect them.
+
+Built-in: `backlog browser` reads its port from `backlog/config.yml` → `default_port`. When Claude runs `backlog browser`, the hook emits an advisory instead of suggesting `PORT_WEB`:
+
+> *"omcport: backlog.md manages its own port 50000 (configured in backlog/config.yml). Run directly — do not override with PORT_WEB or PORT_API."*
+
+If the tool's configured port happens to fall **inside** the omcport pool (13000–17999) AND belongs to another project, you'll get a warning to fix the tool's config file (not a hard block — the hook never blocks fixed-port tools).
+
+**Add more tools** by editing `~/.claude/omcport/fixed-port-tools.json`. Schema:
+
+```json
+[
+  {
+    "cmd": "backlog browser",
+    "config": "backlog/config.yml",
+    "portKey": "default_port",
+    "name": "backlog.md"
+  },
+  {
+    "cmd": "mailhog",
+    "port": 8025,
+    "name": "MailHog"
+  }
+]
+```
+
+| Field | Purpose |
+|-------|---------|
+| `cmd` | substring matched against the Bash command (case-sensitive) |
+| `name` | display name in messages |
+| `config` + `portKey` | reads port from a project-local YAML or JSON config file |
+| `port` | static port (alternative to `config` + `portKey`) |
+
+YAML configs: flat `key: value` only (no nesting). JSON: dot-notation keys (`server.port`) supported.
+
 ### Claim an extra port (for tests, mock servers, etc.)
 
 ```bash
@@ -112,6 +161,7 @@ If you open a feature branch worktree, it gets bucket 1 automatically (13328–1
 
 - Registry: `~/.claude/omcport/registry.toml`
 - Logs: `~/.claude/omcport/log.jsonl` (view with `omcport tail`)
+- Fixed-port tools: `~/.claude/omcport/fixed-port-tools.json`
 - Code: `~/dev/omcport/`
 - Backup (pre-install): `~/.claude/settings.json.bak-pre-omcport`
 
