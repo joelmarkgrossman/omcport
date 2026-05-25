@@ -5,10 +5,11 @@ import React from 'react';
 import { render } from 'ink';
 import { detect } from '../lib/detect.mjs';
 import { loadRegistry, saveRegistry, withRegistryLock, hostnameMatches } from '../lib/registry.mjs';
-import { portFor, WORKTREE_WINDOW, inPool, strideIntersectsDenylist } from '../lib/pool.mjs';
+import { inPool, strideIntersectsDenylist } from '../lib/pool.mjs';
 import { logEvent } from '../lib/log.mjs';
 import { nextFreeBase } from '../lib/allocate.mjs';
 import { getPaths } from '../lib/paths.mjs';
+import { claim as claimSlot, release as releaseSlot } from '../lib/claim.mjs';
 import App from './tui/App.jsx';
 
 const SUBCOMMANDS = {
@@ -70,68 +71,22 @@ function parseFlags(args) {
   return out;
 }
 
-function findWorktreeForBucket(project, bucket) {
-  for (const [k, wt] of Object.entries(project.worktrees ?? {})) {
-    if (wt.bucket === bucket) return k;
-  }
-  return null;
-}
-
 async function cmdClaim(args) {
   const { slot, pid, label } = parseFlags(args);
   if (!slot) throw new Error('claim requires --slot NAME');
-  const resolved = await detect(process.cwd());
-  if (!resolved) throw new Error('cwd is not inside any registered project');
-
-  await withRegistryLock(async () => {
-    const reg = await loadRegistry();
-    const project = reg.projects[resolved.project];
-    const wtKey = findWorktreeForBucket(project, resolved.bucket);
-    if (!wtKey) throw new Error('worktree row missing — registry corrupt');
-    const wt = project.worktrees[wtKey];
-    wt.claims = wt.claims ?? {};
-
-    if (wt.claims[slot]) {
-      console.log(wt.claims[slot].port);
-      return;
-    }
-    const reservedOffsets = new Set(
-      Object.values(wt.claims).map(c => c.offset),
-    );
-    let chosen = null;
-    for (let off = 0; off < WORKTREE_WINDOW; off++) {
-      if (!reservedOffsets.has(off)) { chosen = off; break; }
-    }
-    if (chosen === null) {
-      throw new Error(`window exhausted for ${resolved.project} bucket ${resolved.bucket}`);
-    }
-    const port = portFor({ base: project.base, bucket: resolved.bucket, slotOffset: chosen });
-    wt.claims[slot] = { offset: chosen, port, pid: pid ? parseInt(pid, 10) : null, label: label ?? null };
-    await saveRegistry(reg);
-    await logEvent({ kind: 'claim', project: resolved.project, slot, port });
-    console.log(port);
+  const result = await claimSlot({
+    cwd: process.cwd(),
+    slot,
+    pid: pid ? parseInt(pid, 10) : null,
+    label: label ?? null,
   });
+  console.log(result.port);
 }
 
 async function cmdRelease(args) {
   const { slot } = parseFlags(args);
   if (!slot) throw new Error('release requires --slot NAME');
-  const resolved = await detect(process.cwd());
-  if (!resolved) throw new Error('cwd is not inside any registered project');
-
-  await withRegistryLock(async () => {
-    const reg = await loadRegistry();
-    const project = reg.projects[resolved.project];
-    const wtKey = findWorktreeForBucket(project, resolved.bucket);
-    if (!wtKey) throw new Error('worktree row missing — registry corrupt');
-    const wt = project.worktrees[wtKey];
-    if (!wt.claims || !wt.claims[slot]) {
-      throw new Error(`slot '${slot}' not claimed`);
-    }
-    await logEvent({ kind: 'release', project: resolved.project, slot, port: wt.claims[slot].port });
-    delete wt.claims[slot];
-    await saveRegistry(reg);
-  });
+  await releaseSlot({ cwd: process.cwd(), slot });
 }
 
 async function cmdFree([name]) {
