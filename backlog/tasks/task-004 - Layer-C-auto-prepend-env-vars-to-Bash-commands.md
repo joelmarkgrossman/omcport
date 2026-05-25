@@ -4,8 +4,10 @@ title: 'Layer C: auto-prepend env vars to Bash commands'
 status: To Do
 assignee: []
 created_date: '2026-05-24 21:04'
+updated_date: '2026-05-25 19:19'
 labels:
   - enforcement
+milestone: '1.2'
 dependencies: []
 priority: medium
 ordinal: 4000

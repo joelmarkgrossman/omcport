@@ -1,11 +1,11 @@
 ---
 id: TASK-001.05
 title: 'MCP: commit + push + close task-001'
-status: In Progress
+status: Done
 assignee:
   - claude
 created_date: '2026-05-25 02:28'
-updated_date: '2026-05-25 02:33'
+updated_date: '2026-05-25 02:36'
 labels: []
 dependencies: []
 parent_task_id: TASK-001

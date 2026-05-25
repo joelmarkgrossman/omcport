@@ -4,8 +4,10 @@ title: 'TUI: refresh WorktreePanel immediately after free'
 status: To Do
 assignee: []
 created_date: '2026-05-24 21:04'
+updated_date: '2026-05-25 19:19'
 labels:
   - tui
+milestone: '0.9'
 dependencies: []
 priority: low
 ordinal: 3000

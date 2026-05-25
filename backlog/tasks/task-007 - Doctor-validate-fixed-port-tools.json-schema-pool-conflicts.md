@@ -4,9 +4,11 @@ title: 'Doctor: validate fixed-port-tools.json schema + pool conflicts'
 status: To Do
 assignee: []
 created_date: '2026-05-24 21:04'
+updated_date: '2026-05-25 19:19'
 labels:
   - doctor
   - fixed-port
+milestone: '1.0'
 dependencies: []
 priority: medium
 ordinal: 7000
