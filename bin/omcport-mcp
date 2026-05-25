@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+import('../src/mcp-server.mjs').then(({ startStdioServer }) =>
+  startStdioServer().catch((err) => {
+    process.stderr.write(`omcport-mcp fatal: ${err?.message ?? err}\n`);
+    process.exit(1);
+  })
+);

@@ -1,10 +1,11 @@
 ---
 id: TASK-001
 title: Build MCP server for Cursor agents
-status: To Do
+status: In Progress
 assignee:
   - claude
 created_date: '2026-05-24 20:59'
+updated_date: '2026-05-25 02:28'
 labels: []
 dependencies: []
 priority: high

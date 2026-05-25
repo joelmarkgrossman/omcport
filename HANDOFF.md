@@ -102,6 +102,7 @@ Given a CWD:
 
 ```
 bin/omcport              CLI entry (registers JSX loader, then imports src/cli.mjs)
+bin/omcport-mcp          MCP stdio server entry (used by Cursor + MCP-capable agents)
 hooks/
   pre-tool-use.mjs       PreToolUse hook
   session-start.mjs      SessionStart hook
@@ -117,6 +118,7 @@ lib/
   registry.mjs           loadRegistry(), saveRegistry(), withRegistryLock()
 src/
   cli.mjs                All CLI subcommands
+  mcp-server.mjs         McpServer w/ stdio transport — omcport_here/_claim/_release tools
   tui/
     App.jsx              Main TUI component (2s refresh, all keybindings)
     ProjectList.jsx      Table component
@@ -167,22 +169,18 @@ Hooks are already wired in `~/.claude/settings.json`. Registry seeded with `omcp
 ## Testing
 
 ```bash
-npm test                                    # 66 tests, all pass
+npm test                                    # 84 tests, all pass
 npx vitest run test/integration/            # integration tests only
 bash test-hook.sh /path/to/project         # manual ELI5 hook test
 ```
 
 All tests use `OMCPORT_DIR` env override + cache-busting `?t=${Date.now()}` dynamic imports for isolation. Never use frozen module-level imports from `paths.mjs` — always call `getPaths()` inside each function.
 
-## Next task: MCP server for Cursor agents
+## MCP server (Cursor + MCP-capable agents)
 
-**Goal:** Real port enforcement for Cursor (and any MCP-capable agent), not just soft guidance.
+Cursor agents don't fire Claude Code hooks. A Cursor global rule (`~/.cursor/rules/omcport.mdc`) tells agents to run `omcport here` before starting servers — but it's advisory. The MCP server (`src/mcp-server.mjs`) exposes three structural tools.
 
-Cursor agents don't fire Claude Code hooks. A Cursor global rule (`~/.cursor/rules/omcport.mdc`) is already in place — it instructs agents to run `omcport here` before starting servers. But it's advisory. The MCP server makes it structural.
-
-### Spec
-
-Expose omcport as an MCP server with three tools:
+### Tools
 
 | Tool | Input | Output |
 |------|-------|--------|
@@ -190,31 +188,21 @@ Expose omcport as an MCP server with three tools:
 | `omcport_claim` | `{ cwd: string, slot: string }` | `{ port: number, slot: string }` |
 | `omcport_release` | `{ cwd: string, slot: string }` | `{ ok: true }` |
 
-### Implementation
+All tools return MCP error responses (`isError: true`) for bad input — never crash the server.
 
-- New file: `src/mcp-server.mjs` — stdio MCP server using `@modelcontextprotocol/sdk`
-- Entry point: `bin/omcport-mcp` (same pattern as `bin/omcport`)
-- Reuse existing lib functions: `detect()`, CLI claim/release logic from `src/cli.mjs`
-- Register in `~/.cursor/mcp.json` (already exists at that path)
+### Wiring
 
-### Wire into Cursor
+- Entry: `bin/omcport-mcp` (Node ESM, dynamic-imports `src/mcp-server.mjs`)
+- Cursor: `~/.cursor/mcp.json` → `mcpServers.omcport = { command: 'node', args: ['<abs-path>/bin/omcport-mcp'] }`
+- Backup taken before edit: `~/.cursor/mcp.json.bak-pre-omcport`
 
-```json
-// ~/.cursor/mcp.json — add entry:
-{
-  "mcpServers": {
-    "omcport": {
-      "command": "node",
-      "args": ["/Users/jgrossman/dev/omcport/bin/omcport-mcp"]
-    }
-  }
-}
-```
+### Implementation notes
 
-### Testing
-
-- Unit: mock stdin/stdout MCP exchange, verify `omcport_here` returns correct ports for a tmp registry
-- Manual: open Cursor in any project, ask agent "what port should I use?" — should call `omcport_here` tool
+- Stdio transport via `@modelcontextprotocol/sdk/server/stdio.js`
+- Input schemas: zod
+- Reuses `detect()` from `lib/detect.mjs` + `claim`/`release` from `lib/claim.mjs` (no logic duplication; CLI and MCP server share the same lib functions)
+- Server writes nothing to stdout except MCP protocol frames; errors logged to stderr only
+- Tool handlers run concurrently in the SDK — clients (and tests) must await each response before sending the next request
 
 ## Known limitations / future work
 
