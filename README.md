@@ -31,7 +31,7 @@ ln -sf ~/dev/omcport ~/.claude/omcport
 ln -sf ~/dev/omcport/bin/omcport ~/bin/omcport   # or anywhere on PATH
 ```
 
-Then wire the hooks into `~/.claude/settings.json` (an install script is task-012; for now copy from `HANDOFF.md`).
+Then wire the hooks into `~/.claude/settings.json` (an install script is task-012; for now copy from `ARCHITECTURE.md`).
 
 For Cursor, add to `~/.cursor/mcp.json`:
 
@@ -167,7 +167,7 @@ omcport stops running entirely. Your projects keep their port assignments in the
 
 ## Contributors
 
-- Architecture / design: `HANDOFF.md` (will be renamed to `ARCHITECTURE.md` in 0.9)
+- Architecture / design: `ARCHITECTURE.md`
 - Decision records: `backlog/decisions/`
 - Roadmap: `backlog/milestones/`
 - Implementation plans: `docs/superpowers/plans/`
