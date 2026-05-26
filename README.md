@@ -103,7 +103,7 @@ Both hooks skip the project entirely.
 
 ### Tools that bring their own port
 
-Tools like `backlog.md` and `MailHog` manage their own port via their own config. omcport recognizes them and won't try to redirect. Add new ones by editing `~/.claude/omcport/fixed-port-tools.json`:
+Tools like `backlog.md`, `MailHog`, and `MailPit` manage their own port via their own config. omcport recognizes them and won't try to redirect. The shipped default list lives at `examples/fixed-port-tools.json`. Add new ones by editing `~/.claude/omcport/fixed-port-tools.json`:
 
 ```json
 [
