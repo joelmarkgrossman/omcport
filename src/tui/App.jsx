@@ -1,6 +1,7 @@
 // src/tui/App.jsx
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
+import TextInput from 'ink-text-input';
 import path from 'node:path';
 import os from 'node:os';
 import fsSync from 'node:fs';
@@ -11,6 +12,7 @@ import ProjectList from './ProjectList.jsx';
 import AddProject from './AddProject.jsx';
 import SlotMap from './SlotMap.jsx';
 import WorktreePanel from './WorktreePanel.jsx';
+import { filterProjects } from './helpers.mjs';
 
 export default function App() {
   const { exit } = useApp();
@@ -18,13 +20,27 @@ export default function App() {
   const [livePorts, setLivePorts] = useState(new Map());
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mode, setMode] = useState('list');
+  const [filter, setFilter] = useState('');
+
+  // Visible (filtered + sorted) entries are the single source of truth for both
+  // the list view and the action keybindings (f/k/s/w/r operate on selected row).
+  const visibleEntries = registry
+    ? filterProjects(
+        Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base),
+        filter,
+      )
+    : [];
 
   const refresh = async () => {
     try {
       const [r, l] = await Promise.all([loadRegistry(), listListeningPorts()]);
       setRegistry(r);
       setLivePorts(l);
-      setSelectedIndex(i => Math.max(0, Math.min(i, Object.keys(r.projects).length - 1)));
+      const visibleCount = filterProjects(
+        Object.entries(r.projects).sort((a, b) => a[1].base - b[1].base),
+        filter,
+      ).length;
+      setSelectedIndex(i => Math.max(0, Math.min(i, visibleCount - 1)));
     } catch { /* keep last known state */ }
   };
 
@@ -41,6 +57,7 @@ export default function App() {
     if (input === 'q') exit();
     if (key.upArrow) setSelectedIndex(i => Math.max(0, i - 1));
     if (key.downArrow) setSelectedIndex(i => i + 1);
+    if (input === '/') setMode('filter');
     if (input === 'a') setMode('add');
     if (input === 'f') { await freeSelected(); await refresh(); }
     if (input === 'k') { await killSelected(); await refresh(); }
@@ -51,8 +68,7 @@ export default function App() {
   });
 
   async function freeSelected() {
-    const projects = Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base);
-    const [key] = projects[selectedIndex] ?? [];
+    const [key] = visibleEntries[selectedIndex] ?? [];
     if (!key) return;
     await withRegistryLock(async () => {
       const r = await loadRegistry();
@@ -62,8 +78,7 @@ export default function App() {
   }
 
   async function killSelected() {
-    const projects = Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base);
-    const [, p] = projects[selectedIndex] ?? [];
+    const [, p] = visibleEntries[selectedIndex] ?? [];
     if (!p) return;
     const slotMap = p.slots ?? registry.slots?.defaults ?? {};
     for (const wt of Object.values(p.worktrees ?? {})) {
@@ -90,8 +105,7 @@ export default function App() {
   }
 
   async function reassignBaseSelected() {
-    const projects = Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base);
-    const [key, p] = projects[selectedIndex] ?? [];
+    const [key] = visibleEntries[selectedIndex] ?? [];
     if (!key) return;
     await withRegistryLock(async () => {
       const r = await loadRegistry();
@@ -105,14 +119,28 @@ export default function App() {
   if (!registry) return <Text>loading…</Text>;
 
   if (mode === 'slot-map') {
-    const [key, p] = Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base)[selectedIndex] ?? [];
+    const [key, p] = visibleEntries[selectedIndex] ?? [];
     if (!key) { setMode('list'); return null; }
     return <SlotMap projectKey={key} project={p} registry={registry} livePorts={livePorts} onBack={() => setMode('list')} />;
   }
   if (mode === 'worktrees') {
-    const [key, p] = Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base)[selectedIndex] ?? [];
+    const [key, p] = visibleEntries[selectedIndex] ?? [];
     if (!key) { setMode('list'); return null; }
     return <WorktreePanel projectKey={key} project={p} onBack={() => setMode('list')} onRefresh={refresh} />;
+  }
+  if (mode === 'filter') {
+    return (
+      <Box flexDirection="column">
+        <Text>Filter (project key or root path, case-insensitive). Enter to apply, Esc to clear.</Text>
+        <TextInput
+          value={filter}
+          onChange={setFilter}
+          onSubmit={() => setMode('list')}
+        />
+        <Box marginTop={1}><Text dimColor>[Esc] clear + back</Text></Box>
+        <FilterEscHandler onEscape={() => { setFilter(''); setMode('list'); }} />
+      </Box>
+    );
   }
 
   if (mode === 'add') {
@@ -142,16 +170,37 @@ export default function App() {
     );
   }
 
-  const count = Object.keys(registry.projects).length;
+  const totalCount = Object.keys(registry.projects).length;
+  const visibleCount = visibleEntries.length;
+  const clampedIndex = Math.max(0, Math.min(selectedIndex, visibleCount - 1));
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text>omcport · {count} projects · pool {registry.meta.pool_start}–{registry.meta.pool_end}</Text>
+        <Text>omcport · {visibleCount}{filter ? `/${totalCount}` : ''} projects · pool {registry.meta.pool_start}–{registry.meta.pool_end}</Text>
       </Box>
-      <ProjectList registry={registry} livePorts={livePorts} selectedIndex={Math.min(selectedIndex, count - 1)} />
+      {filter && (
+        <Box marginBottom={1}>
+          <Text dimColor>filter: </Text>
+          <Text color="yellow">{filter}</Text>
+          <Text dimColor>  ([/] edit  [Esc-in-filter] clear)</Text>
+        </Box>
+      )}
+      <ProjectList
+        projects={visibleEntries}
+        slotsDefault={registry.slots?.defaults}
+        livePorts={livePorts}
+        selectedIndex={clampedIndex}
+      />
       <Box marginTop={1}>
-        <Text dimColor>[↑↓] navigate  [a] add  [f] free  [k] kill  [s] slot-map  [w] worktrees  [g] gc  [r] reassign  [q] quit</Text>
+        <Text dimColor>[↑↓] navigate  [/] filter  [a] add  [f] free  [k] kill  [s] slot-map  [w] worktrees  [g] gc  [r] reassign  [q] quit</Text>
       </Box>
     </Box>
   );
+}
+
+// Separate component so useInput can listen for Esc independently of the
+// TextInput child (which captures most keys).
+function FilterEscHandler({ onEscape }) {
+  useInput((_input, key) => { if (key.escape) onEscape(); });
+  return null;
 }

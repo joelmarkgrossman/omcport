@@ -3,8 +3,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { truncate } from './helpers.mjs';
 
-export default function ProjectList({ registry, livePorts, selectedIndex }) {
-  const projects = Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base);
+export default function ProjectList({ projects, slotsDefault, livePorts, selectedIndex }) {
   return (
     <Box flexDirection="column">
       <Box>
@@ -19,7 +18,7 @@ export default function ProjectList({ registry, livePorts, selectedIndex }) {
           .sort((a, b) => a[1].bucket - b[1].bucket)
           .map(([label, wt]) => `${wt.bucket}:${truncate(label, 18)}`)
           .join(', ');
-        const slotMap = p.slots ?? registry.slots?.defaults ?? {};
+        const slotMap = p.slots ?? slotsDefault ?? {};
         const myPorts = [];
         for (const wt of Object.values(p.worktrees ?? {})) {
           for (const [slot, off] of Object.entries(slotMap)) {
