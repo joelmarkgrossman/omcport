@@ -1,9 +1,11 @@
 ---
 id: TASK-013
 title: Add .github/ issue and PR templates
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - claude
 created_date: '2026-05-25 19:20'
+updated_date: '2026-05-26 17:51'
 labels: []
 milestone: '0.9'
 dependencies: []

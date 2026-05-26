@@ -1,10 +1,11 @@
 ---
 id: TASK-006
 title: Expand default fixed-port-tools.json
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - claude
 created_date: '2026-05-24 21:04'
-updated_date: '2026-05-25 19:19'
+updated_date: '2026-05-26 17:53'
 labels:
   - fixed-port
 milestone: '0.9'

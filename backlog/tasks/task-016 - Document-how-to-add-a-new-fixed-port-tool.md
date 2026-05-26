@@ -1,9 +1,10 @@
 ---
 id: TASK-016
 title: Document how to add a new fixed-port tool
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-25 19:20'
+updated_date: '2026-05-26 17:53'
 labels:
   - fixed-port
 milestone: '0.9'

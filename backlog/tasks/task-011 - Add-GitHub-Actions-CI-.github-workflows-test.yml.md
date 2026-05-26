@@ -1,9 +1,11 @@
 ---
 id: TASK-011
 title: Add GitHub Actions CI (.github/workflows/test.yml)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - claude
 created_date: '2026-05-25 19:20'
+updated_date: '2026-05-26 17:05'
 labels:
   - ci
 milestone: '0.9'

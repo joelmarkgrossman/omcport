@@ -1,9 +1,11 @@
 ---
 id: TASK-008
 title: Pick + add LICENSE file (MIT or Apache-2.0)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - claude
 created_date: '2026-05-25 19:20'
+updated_date: '2026-05-26 17:00'
 labels: []
 milestone: '0.9'
 dependencies: []
