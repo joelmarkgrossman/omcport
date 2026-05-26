@@ -26,6 +26,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "ink-testing-library": "^4.0.0",
     "vitest": "^2.1.0"
   }
 }
