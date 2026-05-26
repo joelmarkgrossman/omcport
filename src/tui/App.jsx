@@ -112,7 +112,7 @@ export default function App() {
   if (mode === 'worktrees') {
     const [key, p] = Object.entries(registry.projects).sort((a, b) => a[1].base - b[1].base)[selectedIndex] ?? [];
     if (!key) { setMode('list'); return null; }
-    return <WorktreePanel projectKey={key} project={p} onBack={() => setMode('list')} />;
+    return <WorktreePanel projectKey={key} project={p} onBack={() => setMode('list')} onRefresh={refresh} />;
   }
 
   if (mode === 'add') {
