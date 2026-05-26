@@ -1,0 +1,18 @@
+[
+  {
+    "cmd": "backlog browser",
+    "config": "backlog/config.yml",
+    "portKey": "default_port",
+    "name": "backlog.md"
+  },
+  {
+    "cmd": "mailhog",
+    "port": 8025,
+    "name": "MailHog"
+  },
+  {
+    "cmd": "mailpit",
+    "port": 8025,
+    "name": "MailPit"
+  }
+]

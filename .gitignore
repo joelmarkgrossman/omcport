@@ -4,11 +4,12 @@ node_modules/
 *.log
 test-tmp/
 
-# Runtime data — should live in ~/.claude/omcport/, never in repo
-registry.toml
-registry.toml.bak
-log.jsonl
-fixed-port-tools.json
+# Runtime data — should live in ~/.claude/omcport/, never in repo.
+# Scoped to repo root so examples/fixed-port-tools.json (shipped default) is tracked.
+/registry.toml
+/registry.toml.bak
+/log.jsonl
+/fixed-port-tools.json
 
 # Local orchestration state
 .omc/
