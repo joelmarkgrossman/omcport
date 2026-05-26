@@ -27,11 +27,26 @@ When an agent runs `npm run dev`, omcport tells it which port to use. When an ag
 git clone https://github.com/joelmarkgrossman/omcport ~/dev/omcport
 cd ~/dev/omcport
 npm install --omit=dev
-ln -sf ~/dev/omcport ~/.claude/omcport
-ln -sf ~/dev/omcport/bin/omcport ~/bin/omcport   # or anywhere on PATH
+npm run setup            # symlinks + Claude hooks + seed fixed-port-tools.json
 ```
 
-Then wire the hooks into `~/.claude/settings.json` (an install script is task-012; for now copy from `ARCHITECTURE.md`).
+`npm run setup` is **idempotent**: re-runnable any time, skips anything already in place. Run it with `--dry-run` first to preview:
+
+```bash
+node scripts/install.mjs --dry-run
+```
+
+It will:
+1. Symlink `~/.claude/omcport` → this repo so the Claude hook paths resolve
+2. Symlink `omcport` into `~/bin` or `/usr/local/bin` (whichever is writable)
+3. Patch `~/.claude/settings.json` to register the SessionStart + PreToolUse hooks (backup written to `~/.claude/settings.json.bak-pre-omcport-<timestamp>`)
+4. Seed `~/.claude/omcport/fixed-port-tools.json` from `examples/`
+
+After setup, seed the registry from your existing projects:
+
+```bash
+omcport scan --yes
+```
 
 For Cursor, add to `~/.cursor/mcp.json`:
 

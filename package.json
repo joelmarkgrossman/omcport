@@ -13,7 +13,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "tui": "node ./bin/omcport"
+    "tui": "node ./bin/omcport",
+    "setup": "node ./scripts/install.mjs"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
